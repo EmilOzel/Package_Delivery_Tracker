@@ -4,6 +4,7 @@ import app.controllers.ExceptionController;
 import app.dto.ErrorResponse;
 import app.exceptions.ApiException;
 import app.routes.Routes;
+import app.security.SecurityHandler;
 import io.javalin.Javalin;
 import io.javalin.config.JavalinConfig;
 import io.javalin.http.HttpStatus;
@@ -12,10 +13,12 @@ import io.javalin.validation.ValidationException;
 public class ApplicationConfig {
 
     private final Routes routes;
+    private final SecurityHandler securityHandler;
     private final ExceptionController exceptionController = new ExceptionController();
 
-    public ApplicationConfig(Routes routes) {
+    public ApplicationConfig(Routes routes, SecurityHandler securityHandler) {
         this.routes = routes;
+        this.securityHandler = securityHandler;
     }
 
     public void configuration(JavalinConfig config){
@@ -23,6 +26,7 @@ public class ApplicationConfig {
         config.router.contextPath = "/api"; // base path for all endpoints
         config.http.defaultContentType = "application/json";
         config.routes.apiBuilder(routes.getRoutes());
+        config.routes.beforeMatched(securityHandler::authorizeHttp);
         config.routes.exception(ApiException.class, exceptionController::handleApiException);
         config.routes.exception(ValidationException.class, (e, ctx) -> {
             ctx.status(HttpStatus.BAD_REQUEST);

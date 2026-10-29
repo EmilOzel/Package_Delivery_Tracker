@@ -3,33 +3,54 @@ package app.config;
 import app.daos.UserDAO;
 import app.entities.User;
 import app.enums.Role;
+import app.security.PasswordService;
 import jakarta.persistence.EntityManagerFactory;
 
 public class Populate {
-
-    private static final String DEMO_EMAIL = "emil@example.com";
 
     public static void main(String[] args) {
         EntityManagerFactory emf = HibernateConfig.getEntityManagerFactory();
         try {
             UserDAO userDAO = new UserDAO(emf);
-            if (userDAO.emailExists(DEMO_EMAIL)) {
-                System.out.println("Demo user already exists");
-                return;
-            }
-
-            User user = new User(
+            PasswordService passwordService = new PasswordService();
+            createIfMissing(
+                    userDAO,
+                    passwordService,
                     "Emil",
-                    DEMO_EMAIL,
-                    "not-used-before-security-is-added",
+                    "emil@example.com",
+                    "Demo-password-2026",
                     Role.USER
             );
-            userDAO.create(user);
-            System.out.println("Created demo user with id " + user.getId());
+            createIfMissing(
+                    userDAO,
+                    passwordService,
+                    "Demo Employee",
+                    "employee@example.com",
+                    "Employee-password-2026",
+                    Role.EMPLOYEE
+            );
         } finally {
             if (emf.isOpen()) {
                 emf.close();
             }
         }
+    }
+
+    private static void createIfMissing(
+            UserDAO userDAO,
+            PasswordService passwordService,
+            String name,
+            String email,
+            String password,
+            Role role
+    ) {
+        if (userDAO.emailExists(email)) {
+            System.out.println(email + " already exists");
+            return;
+        }
+
+        User user = new User(name, email, passwordService.hash(password), role);
+        userDAO.create(user);
+        System.out.println("Created " + role + " with id " + user.getId());
     }
 }

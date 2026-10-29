@@ -12,7 +12,6 @@ import lombok.ToString;
 
 public class CreateParcelDTO {
 
-    private int ownerId;
     private String senderName;
     private String recipientName;
     private String destinationAddress;

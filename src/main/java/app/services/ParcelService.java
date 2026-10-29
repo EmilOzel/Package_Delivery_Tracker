@@ -3,6 +3,7 @@ package app.services;
 import app.daos.ParcelDAO;
 import app.daos.UserDAO;
 import app.dto.CreateParcelDTO;
+import app.dto.CreateDeliveryEventDTO;
 import app.dto.DeliveryEventDTO;
 import app.dto.ParcelDTO;
 import app.dto.ValidatedAddress;
@@ -10,8 +11,10 @@ import app.entities.DeliveryEvent;
 import app.entities.Parcel;
 import app.entities.User;
 import app.enums.PackageStatus;
+import app.enums.Role;
 import app.exceptions.ApiException;
 import app.websocket.TrackingSocket;
+import app.security.AuthPrincipal;
 
 import java.util.EnumMap;
 import java.util.List;
@@ -41,10 +44,10 @@ public class ParcelService {
         this.trackingSocket = trackingSocket;
     }
 
-    public ParcelDTO create(CreateParcelDTO request) {
+    public ParcelDTO create(CreateParcelDTO request, AuthPrincipal principal) {
         validateCreateRequest(request);
 
-        User owner = userDAO.findById(request.getOwnerId())
+        User owner = userDAO.findById(principal.getUserId())
                 .orElseThrow(() -> new ApiException(404, "Owner not found"));
 
         ValidatedAddress address = addressService.validate(request.getDestinationAddress());
@@ -61,7 +64,10 @@ public class ParcelService {
         return new ParcelDTO(parcelDAO.createWithInitialEvent(parcel));
     }
 
-    public List<ParcelDTO> findAll() {
+    public List<ParcelDTO> findAll(AuthPrincipal principal) {
+        if (principal.getRole() == Role.USER) {
+            return findAllByOwnerId(principal.getUserId());
+        }
         return parcelDAO.findAll().stream()
                 .map(ParcelDTO::new)
                 .toList();
@@ -76,22 +82,24 @@ public class ParcelService {
                 .toList();
     }
 
-    public ParcelDTO findByTrackingNumber(String trackingNumber) {
+    public ParcelDTO findByTrackingNumber(String trackingNumber, AuthPrincipal principal) {
         if (trackingNumber == null || trackingNumber.isBlank()) {
             throw new ApiException(400, "Tracking number is required");
         }
-        return new ParcelDTO(parcelDAO.findByTrackingNumber(trackingNumber.trim())
-                .orElseThrow(() -> new ApiException(404, "Parcel not found")));
+        Parcel parcel = parcelDAO.findByTrackingNumber(trackingNumber.trim())
+                .orElseThrow(() -> new ApiException(404, "Parcel not found"));
+        requireOwnerOrStaff(parcel, principal);
+        return new ParcelDTO(parcel);
     }
 
-    public List<DeliveryEventDTO> findEvents(int parcelId) {
-        findParcel(parcelId);
+    public List<DeliveryEventDTO> findEvents(int parcelId, AuthPrincipal principal) {
+        requireOwnerOrStaff(findParcel(parcelId), principal);
         return parcelDAO.findEventsByParcelId(parcelId).stream()
                 .map(DeliveryEventDTO::new)
                 .toList();
     }
 
-    public DeliveryEventDTO addEvent(int parcelId, DeliveryEventDTO request) {
+    public DeliveryEventDTO addEvent(int parcelId, CreateDeliveryEventDTO request) {
         if (request == null || request.getStatus() == null) {
             throw new ApiException(400, "Status is required");
         }
@@ -120,8 +128,13 @@ public class ParcelService {
         return result;
     }
 
-    public void delete(int parcelId) {
+    public void delete(int parcelId, AuthPrincipal principal) {
         Parcel parcel = findParcel(parcelId);
+        boolean owner = parcel.getOwner().getId() == principal.getUserId();
+        boolean admin = principal.getRole() == Role.ADMIN;
+        if (!owner && !admin) {
+            throw new ApiException(403, "Access denied");
+        }
         if (parcel.getCurrentStatus() != PackageStatus.CREATED) {
             throw new ApiException(409, "Parcel cannot be deleted after pickup");
         }
@@ -141,9 +154,6 @@ public class ParcelService {
     private void validateCreateRequest(CreateParcelDTO request) {
         if (request == null) {
             throw new ApiException(400, "Request body is required");
-        }
-        if (request.getOwnerId() <= 0) {
-            throw new ApiException(400, "Owner id must be positive");
         }
         requireText(request.getSenderName(), "Sender name is required");
         requireText(request.getRecipientName(), "Recipient name is required");
@@ -195,5 +205,13 @@ public class ParcelService {
 
     private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private void requireOwnerOrStaff(Parcel parcel, AuthPrincipal principal) {
+        boolean owner = parcel.getOwner().getId() == principal.getUserId();
+        boolean staff = principal.getRole() == Role.EMPLOYEE || principal.getRole() == Role.ADMIN;
+        if (!owner && !staff) {
+            throw new ApiException(403, "Access denied");
+        }
     }
 }

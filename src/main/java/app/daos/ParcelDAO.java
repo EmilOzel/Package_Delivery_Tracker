@@ -52,12 +52,9 @@ public class ParcelDAO {
 
     public Optional<Parcel> findByTrackingNumber(String trackingNumber) {
         try (EntityManager em = emf.createEntityManager()) {
-            List<Parcel> parcels = em.createQuery(
-                            "SELECT p FROM Parcel p " +
-                                    "JOIN FETCH p.owner " +
-                                    "WHERE p.trackingNumber = :trackingNumber",
-                            Parcel.class
-                    )
+            List<Parcel> parcels = em.createNamedQuery(
+                            "Parcel.findByTrackingNumber",
+                            Parcel.class)
                     .setParameter("trackingNumber", trackingNumber)
                     .setMaxResults(1)
                     .getResultList();
@@ -149,9 +146,6 @@ public class ParcelDAO {
                     return false;
                 }
 
-                em.createQuery("DELETE FROM DeliveryEvent e WHERE e.parcel.id = :parcelId")
-                        .setParameter("parcelId", parcelId)
-                        .executeUpdate();
                 em.remove(parcel);
                 transaction.commit();
                 return true;

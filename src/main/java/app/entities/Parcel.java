@@ -7,10 +7,16 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 
 @Entity
 @Table(name = "packages")
+@NamedQuery(
+        name = "Parcel.findByTrackingNumber",
+        query = "SELECT p FROM Parcel p JOIN FETCH p.owner WHERE p.trackingNumber = :trackingNumber"
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -46,6 +52,15 @@ public class Parcel {
     @ManyToOne(optional = false)
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
+
+    @OneToMany(
+            mappedBy = "parcel",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
+    )
+    @OrderBy("timestamp ASC")
+    private List<DeliveryEvent> events = new ArrayList<>();
 
     public Parcel(
             String trackingNumber,
