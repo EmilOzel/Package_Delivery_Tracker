@@ -1,0 +1,7 @@
+target
+.idea
+.git
+logs
+tmp
+.env
+src/main/resources/config.properties
