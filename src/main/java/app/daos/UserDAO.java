@@ -36,10 +36,6 @@ public class UserDAO {
         }
     }
 
-    public boolean emailExists(String email) {
-        return findByEmail(email).isPresent();
-    }
-
     public User create(User user) {
         try (EntityManager em = emf.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();

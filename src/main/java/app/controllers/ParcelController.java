@@ -38,11 +38,6 @@ public class ParcelController {
         ctx.status(HttpStatus.CREATED).json(parcelService.addEvent(parcelId(ctx), request));
     }
 
-    public void updateStatus(Context ctx) {
-        CreateDeliveryEventDTO request = ctx.bodyAsClass(CreateDeliveryEventDTO.class);
-        ctx.json(parcelService.addEvent(parcelId(ctx), request));
-    }
-
     public void delete(Context ctx) {
         parcelService.delete(parcelId(ctx), principal(ctx));
         ctx.status(HttpStatus.NO_CONTENT);

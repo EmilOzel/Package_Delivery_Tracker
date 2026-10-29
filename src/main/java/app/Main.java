@@ -14,7 +14,6 @@ import app.services.OpenRouteService;
 import app.services.ParcelService;
 import app.services.AuthService;
 import app.utils.Utils;
-import app.websocket.TrackingSocket;
 import app.security.JwtService;
 import app.security.PasswordService;
 import app.security.SecurityHandler;
@@ -31,7 +30,6 @@ public class Main {
         AddressService addressService = new OpenRouteService(
                 Utils.getConfigurationValue("OPENROUTESERVICE_API_KEY", "config.properties")
         );
-        TrackingSocket trackingSocket = new TrackingSocket();
         PasswordService passwordService = new PasswordService();
         JwtService jwtService = new JwtService(
                 Utils.getConfigurationValue("JWT_SECRET", "config.properties")
@@ -45,11 +43,10 @@ public class Main {
         ParcelService parcelService = new ParcelService(
                 parcelDAO,
                 userDAO,
-                addressService,
-                trackingSocket
+                addressService
         );
         ParcelController parcelController = new ParcelController(parcelService);
-        ParcelRoutes parcelRoutes = new ParcelRoutes(parcelController, trackingSocket);
+        ParcelRoutes parcelRoutes = new ParcelRoutes(parcelController);
 
         Routes routes = new Routes(parcelRoutes, authRoutes);
 
@@ -59,7 +56,7 @@ public class Main {
                 applicationConfig.startServer(serverPort());
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            applicationConfig.stopServer(app);
+            app.stop();
             if (emf.isOpen()) {
                 emf.close();
             }

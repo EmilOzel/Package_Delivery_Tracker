@@ -18,7 +18,6 @@ import app.security.SecurityHandler;
 import app.services.AddressService;
 import app.services.AuthService;
 import app.services.ParcelService;
-import app.websocket.TrackingSocket;
 import io.javalin.Javalin;
 import io.restassured.RestAssured;
 import jakarta.persistence.EntityManagerFactory;
@@ -40,7 +39,6 @@ class ParcelApiTest {
 
     private static EntityManagerFactory emf;
     private static Javalin app;
-    private static TrackingSocket trackingSocket;
 
     @BeforeAll
     static void startApplication() {
@@ -63,12 +61,11 @@ class ParcelApiTest {
                 12.547292
         );
 
-        trackingSocket = new TrackingSocket();
-        ParcelService parcelService = new ParcelService(parcelDAO, userDAO, fakeAddressService, trackingSocket);
+        ParcelService parcelService = new ParcelService(parcelDAO, userDAO, fakeAddressService);
         AuthService authService = new AuthService(userDAO, passwordService, jwtService);
 
         Routes routes = new Routes(
-                new ParcelRoutes(new ParcelController(parcelService), trackingSocket),
+                new ParcelRoutes(new ParcelController(parcelService)),
                 new AuthRoutes(new AuthController(authService))
         );
         SecurityHandler securityHandler = new SecurityHandler(jwtService);
@@ -92,6 +89,82 @@ class ParcelApiTest {
                 .when().get("/parcels")
                 .then().statusCode(401)
                 .body("message", equalTo("Authentication is required"));
+    }
+
+    @Test
+    void invalidTokenIsRejected() {
+        given()
+                .auth().oauth2("not-a-valid-token")
+                .when().get("/parcels")
+                .then().statusCode(401)
+                .body("message", equalTo("Invalid or expired token"));
+    }
+
+    @Test
+    void invalidLoginIsRejected() {
+        given()
+                .contentType("application/json")
+                .body(Map.of(
+                        "email", "unknown@example.com",
+                        "password", "wrong-password"
+                ))
+                .when().post("/auth/login")
+                .then().statusCode(401)
+                .body("message", equalTo("Invalid email or password"));
+    }
+
+    @Test
+    void invalidParcelInputReturnsBadRequest() {
+        String token = registerAndLogin("invalid-input@example.com");
+
+        given()
+                .auth().oauth2(token)
+                .contentType("application/json")
+                .body(Map.of(
+                        "senderName", "",
+                        "recipientName", "Anna",
+                        "destinationAddress", "Nørrebrogade 10, 2200 København N"
+                ))
+                .when().post("/parcels")
+                .then().statusCode(400)
+                .body("message", equalTo("Sender name is required"));
+    }
+
+    @Test
+    void userCannotReadAnotherUsersParcel() {
+        String ownerToken = registerAndLogin("first-owner@example.com");
+        String otherToken = registerAndLogin("other-owner@example.com");
+        String trackingNumber = createParcel(ownerToken);
+
+        given()
+                .auth().oauth2(otherToken)
+                .when().get("/parcels/tracking/{trackingNumber}", trackingNumber)
+                .then().statusCode(403)
+                .body("message", equalTo("Access denied"));
+    }
+
+    @Test
+    void deliveredParcelCannotMoveBackToInTransit() {
+        String userToken = registerAndLogin("delivered-owner@example.com");
+        String employeeToken = login("employee@example.com");
+
+        int parcelId = createParcelId(userToken);
+        String[] statuses = {"PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"};
+        for (String status : statuses) {
+            given()
+                    .auth().oauth2(employeeToken)
+                    .contentType("application/json")
+                    .body(Map.of("status", status))
+                    .when().post("/parcels/{id}/events", parcelId)
+                    .then().statusCode(201);
+        }
+
+        given()
+                .auth().oauth2(employeeToken)
+                .contentType("application/json")
+                .body(Map.of("status", "IN_TRANSIT"))
+                .when().post("/parcels/{id}/events", parcelId)
+                .then().statusCode(409);
     }
 
     @Test
@@ -128,8 +201,8 @@ class ParcelApiTest {
                         "location", "København",
                         "message", "Pakken er afhentet"
                 ))
-                .when().put("/parcels/{id}/status", parcelId)
-                .then().statusCode(200)
+                .when().post("/parcels/{id}/events", parcelId)
+                .then().statusCode(201)
                 .body("status", equalTo("PICKED_UP"));
 
         given()
@@ -137,6 +210,35 @@ class ParcelApiTest {
                 .when().get("/parcels/{id}/events", parcelId)
                 .then().statusCode(200)
                 .body("$", hasSize(2));
+    }
+
+    @Test
+    void ownerCanDeleteNewParcel() {
+        String token = registerAndLogin("delete-owner@example.com");
+        var parcelResponse = given()
+                .auth().oauth2(token)
+                .contentType("application/json")
+                .body(Map.of(
+                        "senderName", "Emil",
+                        "recipientName", "Anna",
+                        "destinationAddress", "Nørrebrogade 10, 2200 København N"
+                ))
+                .when().post("/parcels")
+                .then().statusCode(201)
+                .extract().response();
+
+        int parcelId = parcelResponse.path("id");
+        String trackingNumber = parcelResponse.path("trackingNumber");
+
+        given()
+                .auth().oauth2(token)
+                .when().delete("/parcels/{id}", parcelId)
+                .then().statusCode(204);
+
+        given()
+                .auth().oauth2(token)
+                .when().get("/parcels/tracking/{trackingNumber}", trackingNumber)
+                .then().statusCode(404);
     }
 
     private static String registerAndLogin(String email) {
@@ -157,5 +259,33 @@ class ParcelApiTest {
                 .then().statusCode(200)
                 .body("tokenType", equalTo("Bearer"))
                 .extract().path("token");
+    }
+
+    private static String createParcel(String token) {
+        return given()
+                .auth().oauth2(token)
+                .contentType("application/json")
+                .body(Map.of(
+                        "senderName", "Emil",
+                        "recipientName", "Anna",
+                        "destinationAddress", "Nørrebrogade 10, 2200 København N"
+                ))
+                .when().post("/parcels")
+                .then().statusCode(201)
+                .extract().path("trackingNumber");
+    }
+
+    private static int createParcelId(String token) {
+        return given()
+                .auth().oauth2(token)
+                .contentType("application/json")
+                .body(Map.of(
+                        "senderName", "Emil",
+                        "recipientName", "Anna",
+                        "destinationAddress", "Nørrebrogade 10, 2200 København N"
+                ))
+                .when().post("/parcels")
+                .then().statusCode(201)
+                .extract().path("id");
     }
 }

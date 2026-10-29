@@ -44,7 +44,7 @@ public class Populate {
             String password,
             Role role
     ) {
-        if (userDAO.emailExists(email)) {
+        if (userDAO.findByEmail(email).isPresent()) {
             System.out.println(email + " already exists");
             return;
         }

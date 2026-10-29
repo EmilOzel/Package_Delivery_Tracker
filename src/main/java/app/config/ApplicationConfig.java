@@ -45,7 +45,4 @@ public class ApplicationConfig {
         return app;
     }
 
-    public void stopServer(Javalin app) {
-        app.stop();
-    }
 }

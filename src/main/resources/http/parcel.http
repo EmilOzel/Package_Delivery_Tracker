@@ -64,7 +64,7 @@ Authorization: Bearer {{token}}
 Accept: application/json
 
 ### Statusændring kræver et EMPLOYEE- eller ADMIN-token
-PUT {{baseUrl}}/parcels/{{parcelId}}/status
+POST {{baseUrl}}/parcels/{{parcelId}}/events
 Authorization: Bearer {{employeeToken}}
 Content-Type: application/json
 
@@ -73,6 +73,3 @@ Content-Type: application/json
   "location": "Brøndby",
   "message": "Pakken er blevet afhentet"
 }
-
-### WebSocket
-# ws://localhost:7070/api/parcels/{{trackingNumber}}/live

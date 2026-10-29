@@ -31,7 +31,7 @@ public class Utils {
 
             String value = prop.getProperty(propName);
             if (value != null) {
-                return value.trim();  // Trim whitespace
+                return value.trim();
             } else {
                 throw new ApiException(500, String.format("Property %s not found in %s", propName, resourceName));
             }

@@ -52,9 +52,12 @@ public class ParcelDAO {
 
     public Optional<Parcel> findByTrackingNumber(String trackingNumber) {
         try (EntityManager em = emf.createEntityManager()) {
-            List<Parcel> parcels = em.createNamedQuery(
-                            "Parcel.findByTrackingNumber",
-                            Parcel.class)
+            List<Parcel> parcels = em.createQuery(
+                            "SELECT p FROM Parcel p " +
+                                    "JOIN FETCH p.owner " +
+                                    "WHERE p.trackingNumber = :trackingNumber",
+                            Parcel.class
+                    )
                     .setParameter("trackingNumber", trackingNumber)
                     .setMaxResults(1)
                     .getResultList();
@@ -158,15 +161,4 @@ public class ParcelDAO {
         }
     }
 
-    public boolean trackingNumberExists(String trackingNumber) {
-        try (EntityManager em = emf.createEntityManager()) {
-            Long count = em.createQuery(
-                            "SELECT COUNT(p) FROM Parcel p WHERE p.trackingNumber = :trackingNumber",
-                            Long.class
-                    )
-                    .setParameter("trackingNumber", trackingNumber)
-                    .getSingleResult();
-            return count > 0;
-        }
-    }
 }

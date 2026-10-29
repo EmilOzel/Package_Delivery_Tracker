@@ -13,35 +13,25 @@ import app.entities.User;
 import app.enums.PackageStatus;
 import app.enums.Role;
 import app.exceptions.ApiException;
-import app.websocket.TrackingSocket;
 import app.security.AuthPrincipal;
 
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 public class ParcelService {
 
-    private static final Map<PackageStatus, Set<PackageStatus>> ALLOWED_TRANSITIONS =
-            createAllowedTransitions();
-
     private final ParcelDAO parcelDAO;
     private final UserDAO userDAO;
     private final AddressService addressService;
-    private final TrackingSocket trackingSocket;
 
     public ParcelService(
             ParcelDAO parcelDAO,
             UserDAO userDAO,
-            AddressService addressService,
-            TrackingSocket trackingSocket
+            AddressService addressService
     ) {
         this.parcelDAO = parcelDAO;
         this.userDAO = userDAO;
         this.addressService = addressService;
-        this.trackingSocket = trackingSocket;
     }
 
     public ParcelDTO create(CreateParcelDTO request, AuthPrincipal principal) {
@@ -65,19 +55,11 @@ public class ParcelService {
     }
 
     public List<ParcelDTO> findAll(AuthPrincipal principal) {
-        if (principal.getRole() == Role.USER) {
-            return findAllByOwnerId(principal.getUserId());
-        }
-        return parcelDAO.findAll().stream()
-                .map(ParcelDTO::new)
-                .toList();
-    }
+        List<Parcel> parcels = principal.getRole() == Role.USER
+                ? parcelDAO.findAllByOwnerId(principal.getUserId())
+                : parcelDAO.findAll();
 
-    public List<ParcelDTO> findAllByOwnerId(int ownerId) {
-        if (userDAO.findById(ownerId).isEmpty()) {
-            throw new ApiException(404, "Owner not found");
-        }
-        return parcelDAO.findAllByOwnerId(ownerId).stream()
+        return parcels.stream()
                 .map(ParcelDTO::new)
                 .toList();
     }
@@ -123,9 +105,7 @@ public class ParcelService {
             throw new ApiException(404, "Parcel not found");
         }
 
-        DeliveryEventDTO result = new DeliveryEventDTO(event);
-        trackingSocket.broadcast(parcel.getTrackingNumber(), result);
-        return result;
+        return new DeliveryEventDTO(event);
     }
 
     public void delete(int parcelId, AuthPrincipal principal) {
@@ -167,40 +147,25 @@ public class ParcelService {
     }
 
     private String generateTrackingNumber() {
-        for (int attempt = 0; attempt < 10; attempt++) {
-            String value = UUID.randomUUID()
-                    .toString()
-                    .replace("-", "")
-                    .substring(0, 6)
-                    .toUpperCase();
-            String trackingNumber = "PKG-" + value;
-            if (!parcelDAO.trackingNumberExists(trackingNumber)) {
-                return trackingNumber;
-            }
-        }
-        throw new ApiException(500, "Could not generate a unique tracking number");
+        String value = UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 6)
+                .toUpperCase();
+        return "PKG-" + value;
     }
 
     private boolean isTransitionAllowed(PackageStatus current, PackageStatus next) {
-        return ALLOWED_TRANSITIONS.getOrDefault(current, Set.of()).contains(next);
-    }
-
-    private static Map<PackageStatus, Set<PackageStatus>> createAllowedTransitions() {
-        Map<PackageStatus, Set<PackageStatus>> transitions = new EnumMap<>(PackageStatus.class);
-        transitions.put(PackageStatus.CREATED, Set.of(PackageStatus.PICKED_UP, PackageStatus.CANCELLED));
-        transitions.put(PackageStatus.PICKED_UP, Set.of(PackageStatus.IN_TRANSIT, PackageStatus.CANCELLED));
-        transitions.put(PackageStatus.IN_TRANSIT, Set.of(
-                PackageStatus.AT_SORTING_CENTER,
-                PackageStatus.OUT_FOR_DELIVERY
-        ));
-        transitions.put(PackageStatus.AT_SORTING_CENTER, Set.of(
-                PackageStatus.IN_TRANSIT,
-                PackageStatus.OUT_FOR_DELIVERY
-        ));
-        transitions.put(PackageStatus.OUT_FOR_DELIVERY, Set.of(PackageStatus.DELIVERED));
-        transitions.put(PackageStatus.DELIVERED, Set.of());
-        transitions.put(PackageStatus.CANCELLED, Set.of());
-        return Map.copyOf(transitions);
+        return switch (current) {
+            case CREATED -> next == PackageStatus.PICKED_UP || next == PackageStatus.CANCELLED;
+            case PICKED_UP -> next == PackageStatus.IN_TRANSIT || next == PackageStatus.CANCELLED;
+            case IN_TRANSIT, AT_SORTING_CENTER ->
+                    next == PackageStatus.IN_TRANSIT
+                            || next == PackageStatus.AT_SORTING_CENTER
+                            || next == PackageStatus.OUT_FOR_DELIVERY;
+            case OUT_FOR_DELIVERY -> next == PackageStatus.DELIVERED;
+            case DELIVERED, CANCELLED -> false;
+        };
     }
 
     private String trimToNull(String value) {
