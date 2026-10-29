@@ -1,0 +1,61 @@
+@startuml
+
+skinparam classAttributeIconSize 0
+
+package "entities" {
+
+class User {
+    - int id
+    - String name
+    - String email
+    - String passwordHash
+    - Role role
+}
+
+class Parcel {
+    - int id
+    - String trackingNumber
+    - String senderName
+    - String recipientName
+    - String destinationAddress
+    - Double destinationLatitude
+    - Double destinationLongitude
+    - PackageStatus currentStatus
+    - Instant createdAt
+}
+
+class DeliveryEvent {
+    - int id
+    - PackageStatus status
+    - String location
+    - String message
+    - Instant timestamp
+}
+
+enum Role {
+    USER
+    EMPLOYEE
+    ADMIN
+}
+
+enum PackageStatus {
+    CREATED
+    PICKED_UP
+    IN_TRANSIT
+    AT_SORTING_CENTER
+    OUT_FOR_DELIVERY
+    DELIVERED
+    CANCELLED
+}
+
+}
+
+
+User "1" --> "0..*" Parcel : has
+Parcel "1" --> "0..*" DeliveryEvent : has
+
+User "1" --> "1" Role : has
+Parcel --> PackageStatus
+DeliveryEvent --> PackageStatus
+
+@enduml

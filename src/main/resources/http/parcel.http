@@ -1,0 +1,46 @@
+@baseUrl = http://localhost:7070/api
+
+### Opret en pakke
+POST {{baseUrl}}/parcels
+Content-Type: application/json
+
+{
+  "ownerId": 1,
+  "senderName": "Emil Ozel",
+  "recipientName": "Bo Jensen",
+  "destinationAddress": "Amperestien 10, 2605 Brøndby"
+}
+
+> {%
+    client.global.set("parcelId", response.body.id);
+    client.global.set("trackingNumber", response.body.trackingNumber);
+%}
+
+### Hent alle pakker
+GET {{baseUrl}}/parcels
+Accept: application/json
+
+### Hent pakker for én bruger
+GET {{baseUrl}}/parcels?ownerId=1
+Accept: application/json
+
+### Hent en pakke med trackingnummeret fra oprettelsen
+GET {{baseUrl}}/parcels/tracking/{{trackingNumber}}
+Accept: application/json
+
+### Registrer at pakken er afhentet
+POST {{baseUrl}}/parcels/{{parcelId}}/events
+Content-Type: application/json
+
+{
+  "status": "PICKED_UP",
+  "location": "Brøndby",
+  "message": "Pakken er blevet afhentet"
+}
+
+### Hent pakkens historik
+GET {{baseUrl}}/parcels/{{parcelId}}/events
+Accept: application/json
+
+### Denne sletning giver 409 efter PICKED_UP
+DELETE {{baseUrl}}/parcels/{{parcelId}}
