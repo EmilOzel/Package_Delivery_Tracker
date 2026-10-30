@@ -17,9 +17,9 @@ Et backend-API, hvor brugere kan oprette pakker og følge deres leveringsstatus.
 Projektet anvender dette arkitekturlag:
 
 ```text
-Client → Controller → Service → DAO → PostgreSQL
-                         ↓
-                OpenRouteService
+Client → Routes → Controller → Service → DAO → PostgreSQL
+                                  ↓
+                         OpenRouteService API
 ```
 
 Teknologier:
