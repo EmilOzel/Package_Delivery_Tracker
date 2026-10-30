@@ -38,7 +38,7 @@ Teknologier:
 - OpenRouteService validerer adresser.
 
 # Data Model
-- 'docs' package indeholder ERD
+- ER-DIAGRAMMET FINDES I MAPPEN `DOCS`.
 ```text
 User "1" ─── "0..*" Parcel
 Parcel "1" ─── "1..*" DeliveryEvent
