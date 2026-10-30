@@ -62,7 +62,12 @@ public class ParcelDAO {
                     .setMaxResults(1)
                     .getResultList();
 
-            return parcels.stream().findFirst();
+            if (parcels.isEmpty()) {
+                return Optional.empty();
+            }
+
+            Parcel parcel = parcels.getFirst();
+            return Optional.of(parcel);
         }
     }
 

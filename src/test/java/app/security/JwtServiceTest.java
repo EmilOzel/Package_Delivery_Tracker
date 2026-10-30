@@ -17,14 +17,14 @@ class JwtServiceTest {
         User user = new User("Emil", "emil@example.com", "hash", Role.USER);
         user.setId(42);
 
-        AuthPrincipal principal = jwtService.verify(jwtService.createToken(user));
+        AuthenticateUser principal = jwtService.verify(jwtService.createToken(user));
 
         assertEquals(42, principal.getUserId());
         assertEquals(Role.USER, principal.getRole());
     }
 
     @Test
-    void rejectsTokenSignedWithAnotherSecret() {
+    void rejectsToken() {
         JwtService issuer = new JwtService(SECRET);
         JwtService verifier = new JwtService("another-test-secret-with-at-least-thirty-two-characters");
         User user = new User("Emil", "emil@example.com", "hash", Role.USER);

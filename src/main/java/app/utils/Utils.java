@@ -13,11 +13,15 @@ public class Utils {
     public static String getConfigurationValue(String name, String resourceName) {
         String environmentValue = System.getenv(name);
 
-        if (environmentValue != null && !environmentValue.isBlank()) {
-            return environmentValue.trim();
+        if (environmentValue == null) {
+            return getPropertyValue(name, resourceName);
         }
 
-        return getPropertyValue(name, resourceName);
+        if (environmentValue.isBlank()) {
+            return getPropertyValue(name, resourceName);
+        }
+
+        return environmentValue.trim();
     }
 
     public static String getPropertyValue(String propName, String resourceName)  {
@@ -30,11 +34,11 @@ public class Utils {
             prop.load(is);
 
             String value = prop.getProperty(propName);
-            if (value != null) {
-                return value.trim();
-            } else {
+            if (value == null) {
                 throw new ApiException(500, String.format("Property %s not found in %s", propName, resourceName));
             }
+
+            return value.trim();
         } catch (IOException ex) {
             throw new ApiException(500, String.format("Could not read property %s.", propName));
         }

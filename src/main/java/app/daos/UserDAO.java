@@ -32,7 +32,12 @@ public class UserDAO {
                     .setMaxResults(1)
                     .getResultList();
 
-            return users.stream().findFirst();
+            if (users.isEmpty()) {
+                return Optional.empty();
+            }
+
+            User user = users.getFirst();
+            return Optional.of(user);
         }
     }
 

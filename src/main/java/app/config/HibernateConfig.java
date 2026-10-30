@@ -14,17 +14,14 @@ import java.util.Properties;
 
 public final class HibernateConfig {
 
-    private static volatile EntityManagerFactory emf;
+    private static EntityManagerFactory emf;
 
     private HibernateConfig() {}
 
     public static EntityManagerFactory getEntityManagerFactory() {
         if (emf == null) {
-            synchronized (HibernateConfig.class) {
-                if (emf == null) {
-                    emf = buildEntityManagerFactory(buildProperties());
-                }
-            }
+            Properties properties = buildProperties();
+            emf = buildEntityManagerFactory(properties);
         }
         return emf;
     }
@@ -33,7 +30,10 @@ public final class HibernateConfig {
         Properties props = baseProperties();
 
         String ddlMode = System.getenv("HIBERNATE_DDL_AUTO");
-        props.put("hibernate.hbm2ddl.auto", ddlMode == null ? "update" : ddlMode);
+        if (ddlMode == null) {
+            ddlMode = "update";
+        }
+        props.put("hibernate.hbm2ddl.auto", ddlMode);
 
         if (System.getenv("DEPLOYED") != null) {
             setDeployedProperties(props);
@@ -72,9 +72,10 @@ public final class HibernateConfig {
         configuration.addAnnotatedClass(Parcel.class);
         configuration.addAnnotatedClass(DeliveryEvent.class);
 
-        ServiceRegistry registry = new StandardServiceRegistryBuilder()
-                .applySettings(configuration.getProperties())
-                .build();
+        StandardServiceRegistryBuilder registryBuilder = new StandardServiceRegistryBuilder();
+        registryBuilder.applySettings(configuration.getProperties());
+        ServiceRegistry registry = registryBuilder.build();
+
         SessionFactory sessionFactory = configuration.buildSessionFactory(registry);
         return sessionFactory.unwrap(EntityManagerFactory.class);
     }

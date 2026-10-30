@@ -21,28 +21,32 @@ public class ApplicationConfig {
         this.securityHandler = securityHandler;
     }
 
-    public void configuration(JavalinConfig config){
+    public void configuration(JavalinConfig config) {
         config.bundledPlugins.enableRouteOverview("/routes");
         config.router.contextPath = "/api"; // base path for all endpoints
         config.http.defaultContentType = "application/json";
         config.routes.apiBuilder(routes.getRoutes());
         config.routes.beforeMatched(securityHandler::authorizeHttp);
         config.routes.exception(ApiException.class, exceptionController::handleApiException);
-        config.routes.exception(ValidationException.class, (e, ctx) -> {
-            ctx.status(HttpStatus.BAD_REQUEST);
-            ctx.json(new ErrorResponse(
-                    HttpStatus.BAD_REQUEST.getCode(),
-                    e.getMessage(),
-                    ctx.path()
-            ));
-        });
+        config.routes.exception(ValidationException.class, this::handleValidationException);
         config.routes.exception(Exception.class, exceptionController::handleUnexpectedException);
     }
 
     public Javalin startServer(int port) {
-        var app = Javalin.create(this::configuration);
+        Javalin app = Javalin.create(this::configuration);
         app.start(port);
         return app;
     }
 
+    private void handleValidationException(ValidationException exception, io.javalin.http.Context ctx) {
+        int statusCode = HttpStatus.BAD_REQUEST.getCode();
+        ErrorResponse response = new ErrorResponse(
+                statusCode,
+                exception.getMessage(),
+                ctx.path()
+        );
+
+        ctx.status(HttpStatus.BAD_REQUEST);
+        ctx.json(response);
+    }
 }

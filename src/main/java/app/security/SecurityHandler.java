@@ -18,27 +18,33 @@ public class SecurityHandler {
             return;
         }
 
-        AuthPrincipal principal = authenticateBearer(ctx.header("Authorization"));
+        AuthenticateUser principal = authenticateBearer(ctx.header("Authorization"));
         requireRouteRole(ctx, principal);
         ctx.attribute(PRINCIPAL_ATTRIBUTE, principal);
     }
 
-    public static AuthPrincipal principal(Context ctx) {
-        AuthPrincipal principal = ctx.attribute(PRINCIPAL_ATTRIBUTE);
+    public static AuthenticateUser principal(Context ctx) {
+        AuthenticateUser principal = ctx.attribute(PRINCIPAL_ATTRIBUTE);
         if (principal == null) {
             throw new ApiException(401, "Authentication is required");
         }
         return principal;
     }
 
-    private AuthPrincipal authenticateBearer(String header) {
-        if (header == null || !header.startsWith("Bearer ")) {
+    private AuthenticateUser authenticateBearer(String header) {
+        if (header == null) {
             throw new ApiException(401, "Authentication is required");
         }
-        return jwtService.verify(header.substring(7));
+
+        if (!header.startsWith("Bearer ")) {
+            throw new ApiException(401, "Authentication is required");
+        }
+
+        String token = header.substring(7);
+        return jwtService.verify(token);
     }
 
-    private void requireRouteRole(Context ctx, AuthPrincipal principal) {
+    private void requireRouteRole(Context ctx, AuthenticateUser principal) {
         if (!ctx.routeRoles().contains(principal.getRole())) {
             throw new ApiException(403, "Access denied");
         }

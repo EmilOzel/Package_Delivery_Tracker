@@ -13,8 +13,9 @@ import app.entities.User;
 import app.enums.PackageStatus;
 import app.enums.Role;
 import app.exceptions.ApiException;
-import app.security.AuthPrincipal;
+import app.security.AuthenticateUser;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,7 +35,7 @@ public class ParcelService {
         this.addressService = addressService;
     }
 
-    public ParcelDTO create(CreateParcelDTO request, AuthPrincipal principal) {
+    public ParcelDTO create(CreateParcelDTO request, AuthenticateUser principal) {
         validateCreateRequest(request);
 
         User owner = userDAO.findById(principal.getUserId())
@@ -54,17 +55,23 @@ public class ParcelService {
         return new ParcelDTO(parcelDAO.createWithInitialEvent(parcel));
     }
 
-    public List<ParcelDTO> findAll(AuthPrincipal principal) {
-        List<Parcel> parcels = principal.getRole() == Role.USER
-                ? parcelDAO.findAllByOwnerId(principal.getUserId())
-                : parcelDAO.findAll();
+    public List<ParcelDTO> findAll(AuthenticateUser principal) {
+        List<Parcel> parcels;
 
-        return parcels.stream()
-                .map(ParcelDTO::new)
-                .toList();
+        if (principal.getRole() == Role.USER) {
+            parcels = parcelDAO.findAllByOwnerId(principal.getUserId());
+        } else {
+            parcels = parcelDAO.findAll();
+        }
+
+        List<ParcelDTO> parcelDTOs = new ArrayList<>();
+        for (Parcel parcel : parcels) {
+            parcelDTOs.add(new ParcelDTO(parcel));
+        }
+        return parcelDTOs;
     }
 
-    public ParcelDTO findByTrackingNumber(String trackingNumber, AuthPrincipal principal) {
+    public ParcelDTO findByTrackingNumber(String trackingNumber, AuthenticateUser principal) {
         if (trackingNumber == null || trackingNumber.isBlank()) {
             throw new ApiException(400, "Tracking number is required");
         }
@@ -74,11 +81,16 @@ public class ParcelService {
         return new ParcelDTO(parcel);
     }
 
-    public List<DeliveryEventDTO> findEvents(int parcelId, AuthPrincipal principal) {
+    public List<DeliveryEventDTO> findEvents(int parcelId, AuthenticateUser principal) {
         requireOwnerOrStaff(findParcel(parcelId), principal);
-        return parcelDAO.findEventsByParcelId(parcelId).stream()
-                .map(DeliveryEventDTO::new)
-                .toList();
+
+        List<DeliveryEvent> events = parcelDAO.findEventsByParcelId(parcelId);
+        List<DeliveryEventDTO> eventDTOs = new ArrayList<>();
+
+        for (DeliveryEvent event : events) {
+            eventDTOs.add(new DeliveryEventDTO(event));
+        }
+        return eventDTOs;
     }
 
     public DeliveryEventDTO addEvent(int parcelId, CreateDeliveryEventDTO request) {
@@ -108,7 +120,7 @@ public class ParcelService {
         return new DeliveryEventDTO(event);
     }
 
-    public void delete(int parcelId, AuthPrincipal principal) {
+    public void delete(int parcelId, AuthenticateUser principal) {
         Parcel parcel = findParcel(parcelId);
         boolean owner = parcel.getOwner().getId() == principal.getUserId();
         boolean admin = principal.getRole() == Role.ADMIN;
@@ -156,23 +168,38 @@ public class ParcelService {
     }
 
     private boolean isTransitionAllowed(PackageStatus current, PackageStatus next) {
-        return switch (current) {
-            case CREATED -> next == PackageStatus.PICKED_UP || next == PackageStatus.CANCELLED;
-            case PICKED_UP -> next == PackageStatus.IN_TRANSIT || next == PackageStatus.CANCELLED;
-            case IN_TRANSIT, AT_SORTING_CENTER ->
-                    next == PackageStatus.IN_TRANSIT
-                            || next == PackageStatus.AT_SORTING_CENTER
-                            || next == PackageStatus.OUT_FOR_DELIVERY;
-            case OUT_FOR_DELIVERY -> next == PackageStatus.DELIVERED;
-            case DELIVERED, CANCELLED -> false;
-        };
+        if (current == PackageStatus.CREATED) {
+            return next == PackageStatus.PICKED_UP
+                    || next == PackageStatus.CANCELLED;
+        }
+
+        if (current == PackageStatus.PICKED_UP) {
+            return next == PackageStatus.IN_TRANSIT
+                    || next == PackageStatus.CANCELLED;
+        }
+
+        if (current == PackageStatus.IN_TRANSIT
+                || current == PackageStatus.AT_SORTING_CENTER) {
+            return next == PackageStatus.IN_TRANSIT
+                    || next == PackageStatus.AT_SORTING_CENTER
+                    || next == PackageStatus.OUT_FOR_DELIVERY;
+        }
+
+        if (current == PackageStatus.OUT_FOR_DELIVERY) {
+            return next == PackageStatus.DELIVERED;
+        }
+
+        return false;
     }
 
     private String trimToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
-    private void requireOwnerOrStaff(Parcel parcel, AuthPrincipal principal) {
+    private void requireOwnerOrStaff(Parcel parcel, AuthenticateUser principal) {
         boolean owner = parcel.getOwner().getId() == principal.getUserId();
         boolean staff = principal.getRole() == Role.EMPLOYEE || principal.getRole() == Role.ADMIN;
         if (!owner && !staff) {

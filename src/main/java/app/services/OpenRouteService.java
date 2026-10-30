@@ -26,9 +26,14 @@ public class OpenRouteService implements AddressService {
 
     @Override
     public ValidatedAddress validate(String address) {
-        if (address == null || address.isBlank()) {
+        if (address == null) {
             throw new ApiException(400, "Destination address is required");
         }
+
+        if (address.isBlank()) {
+            throw new ApiException(400, "Destination address is required");
+        }
+
         String encodedAddress = URLEncoder.encode(address.trim(), StandardCharsets.UTF_8);
         String requestUrl = URL
                 + "?text=" + encodedAddress
@@ -36,11 +41,11 @@ public class OpenRouteService implements AddressService {
                 + "&layers=address"
                 + "&size=1";
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(requestUrl))
-                .header("Authorization", apiKey)
-                .GET()
-                .build();
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
+        requestBuilder.uri(URI.create(requestUrl));
+        requestBuilder.header("Authorization", apiKey);
+        requestBuilder.GET();
+        HttpRequest request = requestBuilder.build();
 
         try {
             HttpResponse<String> response = client.send(
@@ -48,24 +53,37 @@ public class OpenRouteService implements AddressService {
                     HttpResponse.BodyHandlers.ofString()
             );
 
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new ApiException(502, "Address service returned status " + response.statusCode());
+            int statusCode = response.statusCode();
+            if (statusCode < 200) {
+                throw new ApiException(502, "Address service returned status " + statusCode);
+            }
+
+            if (statusCode >= 300) {
+                throw new ApiException(502, "Address service returned status " + statusCode);
             }
 
             OpenRouteDTO result = mapper.readValue(
                     response.body(),
                     OpenRouteDTO.class
             );
-            if (result.getFeatures() == null || result.getFeatures().isEmpty()) {
+
+            if (result.getFeatures() == null) {
+                throw new ApiException(400, "Address could not be found");
+            }
+
+            if (result.getFeatures().isEmpty()) {
                 throw new ApiException(400, "Address could not be found");
             }
 
             OpenRouteDTO.Feature feature = result.getFeatures().getFirst();
+            String formattedAddress = feature.getProperties().getLabel();
+            double latitude = feature.getGeometry().getCoordinates().get(1);
+            double longitude = feature.getGeometry().getCoordinates().get(0);
 
             return new ValidatedAddress(
-                    feature.getProperties().getLabel(),
-                    feature.getGeometry().getCoordinates().get(1),
-                    feature.getGeometry().getCoordinates().get(0)
+                    formattedAddress,
+                    latitude,
+                    longitude
             );
         } catch (ApiException exception) {
             throw exception;

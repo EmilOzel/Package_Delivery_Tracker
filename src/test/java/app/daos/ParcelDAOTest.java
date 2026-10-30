@@ -51,7 +51,7 @@ class ParcelDAOTest {
     }
 
     @Test
-    void createsParcelWithInitialEventAndUpdatesStatus() {
+    void createsParcelWithEventAndUpdatesStatus() {
         User owner = userDAO.create(new User(
                 "Parcel Owner",
                 "parcel-owner@example.com",
@@ -61,8 +61,8 @@ class ParcelDAOTest {
         Parcel parcel = new Parcel(
                 "PKG-DAO123",
                 "Emil",
-                "Anna",
-                "Nørrebrogade 10, København",
+                "Bo Jensen",
+                "Amperestien 10, 2605 Brøndby",
                 55.69,
                 12.55,
                 owner

@@ -12,6 +12,7 @@ import app.security.JwtService;
 import app.security.PasswordService;
 
 import java.util.Locale;
+import java.util.Optional;
 
 public class AuthService {
 
@@ -43,12 +44,25 @@ public class AuthService {
     }
 
     public TokenResponseDTO login(LoginRequestDTO request) {
-        if (request == null || request.getEmail() == null || request.getPassword() == null) {
+        if (request == null) {
             throw new ApiException(400, "Email and password are required");
         }
 
-        User user = userDAO.findByEmail(normalizeEmail(request.getEmail()))
-                .orElseThrow(this::invalidCredentials);
+        if (request.getEmail() == null) {
+            throw new ApiException(400, "Email and password are required");
+        }
+
+        if (request.getPassword() == null) {
+            throw new ApiException(400, "Email and password are required");
+        }
+
+        String email = normalizeEmail(request.getEmail());
+        Optional<User> foundUser = userDAO.findByEmail(email);
+        if (foundUser.isEmpty()) {
+            throw invalidCredentials();
+        }
+
+        User user = foundUser.get();
         if (!passwordService.matches(request.getPassword(), user.getPasswordHash())) {
             throw invalidCredentials();
         }
@@ -64,10 +78,20 @@ public class AuthService {
         if (request == null) {
             throw new ApiException(400, "Request body is required");
         }
-        if (request.getName() == null || request.getName().isBlank()) {
+
+        if (request.getName() == null) {
             throw new ApiException(400, "Name is required");
         }
-        if (request.getEmail() == null || !request.getEmail().contains("@")) {
+
+        if (request.getName().isBlank()) {
+            throw new ApiException(400, "Name is required");
+        }
+
+        if (request.getEmail() == null) {
+            throw new ApiException(400, "A valid email is required");
+        }
+
+        if (!request.getEmail().contains("@")) {
             throw new ApiException(400, "A valid email is required");
         }
     }

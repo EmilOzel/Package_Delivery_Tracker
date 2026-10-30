@@ -15,7 +15,11 @@ public class PasswordService {
     }
 
     public boolean matches(String password, String passwordHash) {
-        if (password == null || passwordHash == null) {
+        if (password == null) {
+            return false;
+        }
+
+        if (passwordHash == null) {
             return false;
         }
 
@@ -27,7 +31,11 @@ public class PasswordService {
     }
 
     private void validate(String password) {
-        if (password == null || password.isBlank()) {
+        if (password == null) {
+            throw new ApiException(400, "Password is required");
+        }
+
+        if (password.isBlank()) {
             throw new ApiException(400, "Password is required");
         }
         if (password.length() < 10) {
