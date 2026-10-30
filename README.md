@@ -6,9 +6,9 @@ Et backend-API, hvor brugere kan oprette pakker og følge deres leveringsstatus.
 
 ## Links
 
-- [Deployed API](https://api.ozeldemo.dk/api/)
-- [GitHub repository](https://github.com/EmilOzel/Package_Delivery_Tracker)
-- Portfolio: `INDSÆT LINK`
+- Deployed API: https://api.ozeldemo.dk/api/
+- GitHub repository: https://github.com/EmilOzel/Package_Delivery_Tracker
+- Portfolio: https://emilozel.github.io/Portfolio/
 
 # Architecture
 
