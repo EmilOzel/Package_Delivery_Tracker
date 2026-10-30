@@ -1,5 +1,7 @@
 @baseUrl = https://api.ozeldemo.dk/api
 //http://localhost:7070/api//
+//https://api.ozeldemo.dk/api//
+
 ### Registrer bruger
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
@@ -10,11 +12,25 @@ Content-Type: application/json
   "password": "Sikkert-password-2026"
 }
 
+
+
+
+### Registrer demo-medarbejder
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Demo Employee",
+  "email": "employee@example.com",
+  "password": "Employee-password-2026"
+}
+
 ### Login og gem JWT
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
+
   "email": "emil@example.com",
   "password": "Sikkert-password-2026"
 }

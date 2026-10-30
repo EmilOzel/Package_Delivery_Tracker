@@ -80,7 +80,11 @@ class ParcelApiTest {
     static void stopApplication() {
         RestAssured.reset();
         if (app != null) app.stop();
-        if (emf != null && emf.isOpen()) emf.close();
+        if (emf != null) {
+            if (emf.isOpen()) {
+                emf.close();
+            }
+        }
     }
 
     @Test

@@ -31,8 +31,10 @@ class ParcelDAOTest {
 
     @AfterAll
     static void tearDown() {
-        if (emf != null && emf.isOpen()) {
-            emf.close();
+        if (emf != null) {
+            if (emf.isOpen()) {
+                emf.close();
+            }
         }
     }
 

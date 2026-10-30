@@ -14,7 +14,7 @@ Et backend-API, hvor brugere kan oprette pakker og følge deres leveringsstatus.
 
 ## System Overview
 
-Projektet anvender en lagdelt arkitektur:
+Projektet anvender dette arkitekturlag:
 
 ```text
 Client → Controller → Service → DAO → PostgreSQL
@@ -97,16 +97,12 @@ Authorization: Bearer <token>
 
 # User Stories
 
-- Som besøgende vil jeg kunne registrere en konto, så jeg kan bruge systemet.
-- Som bruger vil jeg kunne oprette en pakke.
-- Som bruger vil jeg kunne se mine egne pakker.
-- Som bruger vil jeg kunne finde en pakke ved hjælp af dens trackingnummer.
-- Som bruger vil jeg kunne se en pakkes leveringshistorik.
-- Som bruger vil jeg være sikker på, at andre brugere ikke kan se mine pakker.
-- Som medarbejder vil jeg kunne registrere leveringsproblemer.
-- Som medarbejder vil jeg kunne ændre en pakkes status.
-- Som administrator vil jeg kunne administrere pakker.
-- Som bruger vil jeg have min destinationsadresse bekræftet, når jeg opretter en pakke.
+- Som besøgende ønsker jeg at kunne registrere en konto og logge ind, så jeg kan bruge systemet.
+- Som bruger ønsker jeg at kunne oprette en pakke med en valideret destinationsadresse, så adressen og koordinaterne bliver gemt korrekt.
+- Som bruger ønsker jeg at kunne se mine egne pakker, så jeg kan følge deres aktuelle status.
+- Som bruger ønsker jeg at kunne finde en af mine pakker med dens trackingnummer, så jeg hurtigt kan slå den op.
+- Som bruger ønsker jeg at kunne se en pakkes leveringshistorik, så jeg kan følge pakkens statusændringer.
+- Som medarbejder ønsker jeg at kunne registrere delivery events og ændre en pakkes status, så leveringsforløbet bliver opdateret.
 
 # Development Notes
 

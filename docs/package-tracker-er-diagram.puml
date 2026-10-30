@@ -22,10 +22,12 @@ class Parcel {
     - Double destinationLongitude
     - PackageStatus currentStatus
     - Instant createdAt
+    - int ownerId <<FK>>
 }
 
 class DeliveryEvent {
     - int id
+    - int packageId <<FK>>
     - PackageStatus status
     - String location
     - String message
@@ -50,12 +52,11 @@ enum PackageStatus {
 
 }
 
+User "1" -- "0..*" Parcel : has
+Parcel "1" -- "0..*" DeliveryEvent : has
 
-User "1" --> "0..*" Parcel : has
-Parcel "1" --> "0..*" DeliveryEvent : has
-
-User "1" --> "1" Role : has
-Parcel --> PackageStatus
-DeliveryEvent --> PackageStatus
+User ..> Role : has
+Parcel ..> PackageStatus
+DeliveryEvent ..> PackageStatus
 
 @enduml

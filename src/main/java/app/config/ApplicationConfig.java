@@ -7,6 +7,7 @@ import app.routes.Routes;
 import app.security.SecurityHandler;
 import io.javalin.Javalin;
 import io.javalin.config.JavalinConfig;
+import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 import io.javalin.validation.ValidationException;
 
@@ -38,7 +39,7 @@ public class ApplicationConfig {
         return app;
     }
 
-    private void handleValidationException(ValidationException exception, io.javalin.http.Context ctx) {
+    private void handleValidationException(ValidationException exception, Context ctx) {
         int statusCode = HttpStatus.BAD_REQUEST.getCode();
         ErrorResponse response = new ErrorResponse(
                 statusCode,

@@ -17,6 +17,7 @@ import app.security.AuthenticateUser;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public class ParcelService {
@@ -38,8 +39,12 @@ public class ParcelService {
     public ParcelDTO create(CreateParcelDTO request, AuthenticateUser principal) {
         validateCreateRequest(request);
 
-        User owner = userDAO.findById(principal.getUserId())
-                .orElseThrow(() -> new ApiException(404, "Owner not found"));
+        Optional<User> foundOwner = userDAO.findById(principal.getUserId());
+        if (foundOwner.isEmpty()) {
+            throw new ApiException(404, "Owner not found");
+        }
+
+        User owner = foundOwner.get();
 
         ValidatedAddress address = addressService.validate(request.getDestinationAddress());
         Parcel parcel = new Parcel(
@@ -72,11 +77,20 @@ public class ParcelService {
     }
 
     public ParcelDTO findByTrackingNumber(String trackingNumber, AuthenticateUser principal) {
-        if (trackingNumber == null || trackingNumber.isBlank()) {
+        if (trackingNumber == null) {
             throw new ApiException(400, "Tracking number is required");
         }
-        Parcel parcel = parcelDAO.findByTrackingNumber(trackingNumber.trim())
-                .orElseThrow(() -> new ApiException(404, "Parcel not found"));
+
+        if (trackingNumber.isBlank()) {
+            throw new ApiException(400, "Tracking number is required");
+        }
+
+        Optional<Parcel> foundParcel = parcelDAO.findByTrackingNumber(trackingNumber.trim());
+        if (foundParcel.isEmpty()) {
+            throw new ApiException(404, "Parcel not found");
+        }
+
+        Parcel parcel = foundParcel.get();
         requireOwnerOrStaff(parcel, principal);
         return new ParcelDTO(parcel);
     }
@@ -94,7 +108,11 @@ public class ParcelService {
     }
 
     public DeliveryEventDTO addEvent(int parcelId, CreateDeliveryEventDTO request) {
-        if (request == null || request.getStatus() == null) {
+        if (request == null) {
+            throw new ApiException(400, "Status is required");
+        }
+
+        if (request.getStatus() == null) {
             throw new ApiException(400, "Status is required");
         }
 
@@ -124,13 +142,16 @@ public class ParcelService {
         Parcel parcel = findParcel(parcelId);
         boolean owner = parcel.getOwner().getId() == principal.getUserId();
         boolean admin = principal.getRole() == Role.ADMIN;
-        if (!owner && !admin) {
-            throw new ApiException(403, "Access denied");
+        if (!owner) {
+            if (!admin) {
+                throw new ApiException(403, "Access denied");
+            }
         }
         if (parcel.getCurrentStatus() != PackageStatus.CREATED) {
             throw new ApiException(409, "Parcel cannot be deleted after pickup");
         }
-        if (!parcelDAO.deleteById(parcelId)) {
+        boolean deleted = parcelDAO.deleteById(parcelId);
+        if (!deleted) {
             throw new ApiException(404, "Parcel not found");
         }
     }
@@ -139,8 +160,12 @@ public class ParcelService {
         if (parcelId <= 0) {
             throw new ApiException(400, "Parcel id must be positive");
         }
-        return parcelDAO.findById(parcelId)
-                .orElseThrow(() -> new ApiException(404, "Parcel not found"));
+        Optional<Parcel> foundParcel = parcelDAO.findById(parcelId);
+        if (foundParcel.isEmpty()) {
+            throw new ApiException(404, "Parcel not found");
+        }
+
+        return foundParcel.get();
     }
 
     private void validateCreateRequest(CreateParcelDTO request) {
@@ -153,47 +178,90 @@ public class ParcelService {
     }
 
     private void requireText(String value, String message) {
-        if (value == null || value.isBlank()) {
+        if (value == null) {
+            throw new ApiException(400, message);
+        }
+
+        if (value.isBlank()) {
             throw new ApiException(400, message);
         }
     }
 
     private String generateTrackingNumber() {
-        String value = UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 6)
-                .toUpperCase();
-        return "PKG-" + value;
+        String uuid = UUID.randomUUID().toString();
+        String uuidWithoutHyphens = uuid.replace("-", "");
+        String shortUuid = uuidWithoutHyphens.substring(0, 6);
+        String uppercaseUuid = shortUuid.toUpperCase();
+
+        return "PKG-" + uppercaseUuid;
     }
 
     private boolean isTransitionAllowed(PackageStatus current, PackageStatus next) {
         if (current == PackageStatus.CREATED) {
-            return next == PackageStatus.PICKED_UP
-                    || next == PackageStatus.CANCELLED;
+            if (next == PackageStatus.PICKED_UP) {
+                return true;
+            }
+
+            if (next == PackageStatus.CANCELLED) {
+                return true;
+            }
+
+            return false;
         }
 
         if (current == PackageStatus.PICKED_UP) {
-            return next == PackageStatus.IN_TRANSIT
-                    || next == PackageStatus.CANCELLED;
+            if (next == PackageStatus.IN_TRANSIT) {
+                return true;
+            }
+
+            if (next == PackageStatus.CANCELLED) {
+                return true;
+            }
+
+            return false;
         }
 
-        if (current == PackageStatus.IN_TRANSIT
-                || current == PackageStatus.AT_SORTING_CENTER) {
-            return next == PackageStatus.IN_TRANSIT
-                    || next == PackageStatus.AT_SORTING_CENTER
-                    || next == PackageStatus.OUT_FOR_DELIVERY;
+        if (current == PackageStatus.IN_TRANSIT) {
+            return isTransportStatus(next);
+        }
+
+        if (current == PackageStatus.AT_SORTING_CENTER) {
+            return isTransportStatus(next);
         }
 
         if (current == PackageStatus.OUT_FOR_DELIVERY) {
-            return next == PackageStatus.DELIVERED;
+            if (next == PackageStatus.DELIVERED) {
+                return true;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    private boolean isTransportStatus(PackageStatus status) {
+        if (status == PackageStatus.IN_TRANSIT) {
+            return true;
+        }
+
+        if (status == PackageStatus.AT_SORTING_CENTER) {
+            return true;
+        }
+
+        if (status == PackageStatus.OUT_FOR_DELIVERY) {
+            return true;
         }
 
         return false;
     }
 
     private String trimToNull(String value) {
-        if (value == null || value.isBlank()) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value.isBlank()) {
             return null;
         }
         return value.trim();
@@ -201,9 +269,18 @@ public class ParcelService {
 
     private void requireOwnerOrStaff(Parcel parcel, AuthenticateUser principal) {
         boolean owner = parcel.getOwner().getId() == principal.getUserId();
-        boolean staff = principal.getRole() == Role.EMPLOYEE || principal.getRole() == Role.ADMIN;
-        if (!owner && !staff) {
-            throw new ApiException(403, "Access denied");
+        if (owner) {
+            return;
         }
+
+        if (principal.getRole() == Role.EMPLOYEE) {
+            return;
+        }
+
+        if (principal.getRole() == Role.ADMIN) {
+            return;
+        }
+
+        throw new ApiException(403, "Access denied");
     }
 }
